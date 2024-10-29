@@ -4,6 +4,7 @@ from typing import List, Tuple, Optional, Dict, Any
 from dotenv import load_dotenv
 import os
 from cron_descriptor import get_description
+
 DB_FILE = os.getenv("DB_FILE")
 
 
@@ -11,6 +12,7 @@ def init_db():
     """
     Initialize the database and create the game_watch table if it doesn't exist.
     """
+
     load_dotenv()
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -55,7 +57,8 @@ def add_game_watch(game_id: str, game_name: str, price_watch_type: str, schedule
     cursor.execute('SELECT * FROM game_watch WHERE game_name = ?', (game_name,))
     game_exists = cursor.fetchone()
     if game_exists:
-        raise FileExistsError(f"The entry with game name '{game_name}' already exists. Please delete or use update_game function.")
+        raise FileExistsError(
+            f"The entry with game name '{game_name}' already exists. Please delete or use update_game function.")
 
     # Validate watch type
     allowed_watch_types = ['all time low', 'lower than', 'discount']
@@ -137,7 +140,7 @@ def update_game_watch(
     elif price_watch_type == "all time low":
         if max_price is not None or discount_percentage is not None:
             raise ValueError("'all time low' watch type should not have max_price or discount_percentage.")
-    
+
     # Prepare fields to update
     fields_to_update = {}
     if game_name is not None:

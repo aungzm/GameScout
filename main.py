@@ -16,6 +16,7 @@ from dbdriver import retrieve_current_hour_watches, add_game_watch, retrieve_all
 
 # Load environment variables
 load_dotenv()
+DB_FILE = os.getenv("DB_FILE")
 TOKEN = os.getenv("DISCORD_TOKEN")
 API_KEY = os.getenv("API_KEY")
 
@@ -30,7 +31,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     print(f"Logged in as {bot.user} (ID: {bot.user.id})")
     print("------")
-    init_db()
+    init_db(DB_FILE)
     check_price_watches.start()  # Start the scheduled task directly without parentheses
 
 

@@ -85,6 +85,7 @@ class TestDatabaseFunctions(unittest.TestCase):
 
     def test_update_game_watch(self):
         """Test updating a game watch entry in the database."""
+        # Add the initial game watch entry
         add_game_watch(
             game_id=self.game_id,
             game_name=self.game_name,
@@ -94,11 +95,20 @@ class TestDatabaseFunctions(unittest.TestCase):
             max_price=self.max_price,
             discount_percentage=self.discount_percentage
         )
+
+        # Retrieve the game ID directly from the database after insertion
+        self.cursor.execute("SELECT id FROM game_watch WHERE game_name = ?", (self.game_name,))
+        result = self.cursor.fetchone()
+        game_id = result[0]  # Fetch the ID from the query result
+
+        # Perform the update using the retrieved game ID
         update_game_watch(
-            game_id=result[0],
+            game_id=game_id,
             game_name="Updated Game",
             max_price=25.00
         )
+
+        # Verify the update
         updated_info = list_game_info("Updated Game")[0]
         self.assertEqual(updated_info["game_name"], "Updated Game")
         self.assertEqual(updated_info["max_price"], 25.00)

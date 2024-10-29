@@ -31,7 +31,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     print(f"Logged in as {bot.user} (ID: {bot.user.id})")
     print("------")
-    init_db(DB_FILE)
+    init_db()
     check_price_watches.start()  # Start the scheduled task directly without parentheses
 
 
@@ -89,22 +89,45 @@ async def add_watch(ctx, game_name: str, country: str, watch_type: str, schedule
 
 
 @bot.command(name="update_watch")
-async def update_watch(ctx, game_name: str = None, watch_type: str = None, schedule: str = None,
-                       max_price: float = None, discount_percentage: float = None):
+async def update_watch(ctx, game_name: str, country: str, watch_type: str = None, schedule: str = None,
+                       max_price: Optional[float] = None, discount_percentage: Optional[float] = None):
     """
     Updates an existing game watch by game ID.
-    Usage: !update_watch <game_id> [game_name] [watch_type] [schedule] [max_price] [discount_percentage]
+    Usage: !update_watch <game_name> <watch_type> <schedule> [max_price] [discount_percentage]
     """
+    # Fetch the game ID based on game name
     game_id = get_game_id(game_name)
-    if game_id is not None:
-        await ctx.send(f"Could not find game with such name")
-    else:
-        try:
-            update_game_watch(game_id, game_name, watch_type, schedule, max_price=max_price,
-                              discount_percentage=discount_percentage)
-            await ctx.send(f"Updated watch for game ID {game_id}.")
-        except ValueError as e:
-            await ctx.send(str(e))
+    if game_id is None:
+        await ctx.send("Could not find game with such name.")
+        return
+
+    # Rearrange `max_price` to `discount_percentage` if `watch_type` is "discount"
+    if watch_type and watch_type.lower() == "discount":
+        discount_percentage = max_price  # Assign `max_price` input to `discount_percentage`
+        max_price = None  # Clear `max_price` since it's not used for discount type
+
+    # Convert to float if values are provided, handling potential conversion issues
+    try:
+        max_price = float(max_price) if max_price is not None else None
+        discount_percentage = float(discount_percentage) if discount_percentage is not None else None
+    except ValueError:
+        await ctx.send("Invalid input: max_price and discount_percentage must be valid numbers.")
+        return
+
+    try:
+        # Call the update function
+        update_game_watch(
+            game_id=game_id,
+            game_name=game_name,
+            price_watch_type=watch_type,
+            cron_schedule=schedule,
+            country=country,
+            max_price=max_price,
+            discount_percentage=discount_percentage
+        )
+        await ctx.send(f"Updated watch for {game_name}.")
+    except ValueError as e:
+        await ctx.send(f"Update failed: {str(e)}")
 
 
 @bot.command(name="delete_watch")

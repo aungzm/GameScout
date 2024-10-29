@@ -102,31 +102,23 @@ def update_game_watch(
 ) -> None:
     """
     Updates a game watch entry in the database based on the provided game ID and fields.
-
-    Args:
-        game_id (int): The ID of the game watch to update.
-        game_name (Optional[str]): The new name of the game.
-        price_watch_type (Optional[str]): The new type of price watch ('all time low', 'lower than', 'discount').
-        cron_schedule (Optional[str]): The new schedule for checking the price.
-        country (Optional[str]): The new country code for the watch.
-        max_price (Optional[float]): The maximum price for "lower than" watch type.
-        discount_percentage (Optional[float]): The percentage discount for "discount" watch type.
     """
-    # Allowed watch types
+    # Connect to the database
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM game_watch WHERE game_name = ?', game_name)
-    game_exists = cursor.fetchall()
-    if game_exists is None:
-        raise FileExistsError(
-            f"The entry with {game_name} does not exist")
+
+    # Check if the game watch entry exists
+    cursor.execute('SELECT * FROM game_watch WHERE game_id = ?', (game_id,))
+    if not cursor.fetchone():
+        raise FileNotFoundError(f"No game watch entry found with ID {game_id}")
+
+    # Allowed watch types
     allowed_watch_types = ['all time low', 'lower than', 'discount']
-    # Validate price_watch_type
     if price_watch_type and price_watch_type not in allowed_watch_types:
         raise ValueError(
             f"Invalid price_watch_type '{price_watch_type}'. Allowed types are: {', '.join(allowed_watch_types)}.")
 
-    # Validate max_price and discount_percentage based on price_watch_type
+    # Validate fields based on watch type
     if price_watch_type == "lower than":
         if max_price is None:
             raise ValueError("max_price is required for 'lower than' watch type.")
@@ -141,27 +133,26 @@ def update_game_watch(
         if max_price is not None or discount_percentage is not None:
             raise ValueError("'all time low' watch type should not have max_price or discount_percentage.")
 
-    # Prepare fields to update
-    fields_to_update = {}
-    if game_name is not None:
+    # Prepare fields to update based on provided values
+    fields_to_update: Dict[str, Any] = {}
+    if game_name:
         fields_to_update["game_name"] = game_name
-    if price_watch_type is not None:
+    if price_watch_type:
         fields_to_update["price_watch_type"] = price_watch_type
-    if cron_schedule is not None:
+    if cron_schedule:
         fields_to_update["cron_schedule"] = cron_schedule
-    if country is not None:
+    if country:
         fields_to_update["country"] = country
-    if price_watch_type == "lower than" and max_price is not None:
+    if max_price is not None:
         fields_to_update["max_price"] = max_price
-    if price_watch_type == "discount" and discount_percentage is not None:
+    if discount_percentage is not None:
         fields_to_update["discount_percentage"] = discount_percentage
 
-    # Construct the SQL query dynamically
+    # Build the update query dynamically
     set_clause = ", ".join([f"{field} = ?" for field in fields_to_update.keys()])
-    values = list(fields_to_update.values()) + [game_id]
+    values = list(fields_to_update.values()) + [game_id]  # Values for placeholders
 
     # Execute the update query
-
     cursor.execute(f'''
         UPDATE game_watch
         SET {set_clause}

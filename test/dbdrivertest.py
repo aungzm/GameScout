@@ -41,7 +41,7 @@ class TestDatabaseFunctions(unittest.TestCase):
         self.price_watch_type = "lower than"
         self.schedule = "0 9 * * 1"
         self.country = "US"
-        self.max_price = 20.00
+        self.target_value = 20.00
         self.discount_percentage = None
 
     def tearDown(self):
@@ -76,8 +76,7 @@ class TestDatabaseFunctions(unittest.TestCase):
             price_watch_type=self.price_watch_type,
             schedule=self.schedule,
             country=self.country,
-            max_price=self.max_price,
-            discount_percentage=self.discount_percentage
+            target_value=self.target_value,
         )
         self.cursor.execute("SELECT * FROM game_watch WHERE game_name = ?", (self.game_name,))
         result1 = self.cursor.fetchone()
@@ -87,14 +86,13 @@ class TestDatabaseFunctions(unittest.TestCase):
     def test_update_game_watch(self):
         """Test updating a game watch entry in the database."""
         # Add the initial game watch entry
-        add_game_watch(
+        dbdriver.add_game_watch(
             game_id=self.game_id,
             game_name=self.game_name,
             price_watch_type=self.price_watch_type,
             schedule=self.schedule,
             country=self.country,
-            max_price=self.max_price,
-            discount_percentage=self.discount_percentage
+            target_value=self.target_value,
         )
 
         # Retrieve the ID directly after insertion
@@ -132,8 +130,7 @@ class TestDatabaseFunctions(unittest.TestCase):
             price_watch_type=self.price_watch_type,
             schedule=self.schedule,
             country=self.country,
-            max_price=self.max_price,
-            discount_percentage=self.discount_percentage
+            target_value=self.target_value,
         )
         game_names = retrieve_game_names()
         self.assertIn(self.game_name, game_names)
@@ -146,8 +143,7 @@ class TestDatabaseFunctions(unittest.TestCase):
             price_watch_type=self.price_watch_type,
             schedule=self.schedule,
             country=self.country,
-            max_price=self.max_price,
-            discount_percentage=self.discount_percentage
+            target_value=self.target_value,
         )
         game_info = list_game_info(self.game_name)
         self.assertEqual(game_info[0]["game_name"], self.game_name)
@@ -160,8 +156,7 @@ class TestDatabaseFunctions(unittest.TestCase):
             price_watch_type=self.price_watch_type,
             schedule=self.schedule,
             country=self.country,
-            max_price=self.max_price,
-            discount_percentage=self.discount_percentage
+            target_value=self.target_value,
         )
         all_info = retrieve_all_info()
         self.assertGreater(len(all_info), 0)
@@ -174,8 +169,7 @@ class TestDatabaseFunctions(unittest.TestCase):
             price_watch_type=self.price_watch_type,
             schedule=self.schedule,
             country=self.country,
-            max_price=self.max_price,
-            discount_percentage=self.discount_percentage
+            target_value=self.target_value,
         )
         retrieved_schedule = retrieve_schedule_for_game(self.game_id)
         self.assertEqual(retrieved_schedule, self.schedule)
@@ -188,8 +182,7 @@ class TestDatabaseFunctions(unittest.TestCase):
             price_watch_type=self.price_watch_type,
             schedule=self.schedule,
             country=self.country,
-            max_price=self.max_price,
-            discount_percentage=self.discount_percentage
+            target_value=self.target_value,
         )
         delete_game_watch_by_id(self.game_id)
         result = list_game_info(self.game_name)
@@ -203,8 +196,7 @@ class TestDatabaseFunctions(unittest.TestCase):
             price_watch_type=self.price_watch_type,
             schedule=self.schedule,
             country=self.country,
-            max_price=self.max_price,
-            discount_percentage=self.discount_percentage
+            target_value=self.target_value,
         )
         delete_game_watch_by_name(self.game_name)
         result = list_game_info(self.game_name)
@@ -218,8 +210,7 @@ class TestDatabaseFunctions(unittest.TestCase):
             price_watch_type=self.price_watch_type,
             schedule=self.schedule,
             country=self.country,
-            max_price=self.max_price,
-            discount_percentage=self.discount_percentage
+            target_value=self.target_value,
         )
         new_schedule = "0 10 * * 2"
         update_schedule_for_game(self.game_id, new_schedule)
@@ -234,8 +225,7 @@ class TestDatabaseFunctions(unittest.TestCase):
             price_watch_type=self.price_watch_type,
             schedule=self.schedule,
             country=self.country,
-            max_price=self.max_price,
-            discount_percentage=self.discount_percentage
+            target_value=self.target_value,
         )
         all_watches = retrieve_all_watches()
         self.assertGreater(len(all_watches), 0)
@@ -253,8 +243,7 @@ class TestDatabaseFunctions(unittest.TestCase):
             price_watch_type=self.price_watch_type,
             schedule=self.schedule,
             country=self.country,
-            max_price=self.max_price,
-            discount_percentage=self.discount_percentage
+            target_value=self.target_value,
         )
 
         # Retrieve watches scheduled for the current hour

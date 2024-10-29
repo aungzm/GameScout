@@ -9,7 +9,7 @@ import pycountry
 load_dotenv()
 API_KEY: Optional[str] = os.getenv('API_KEY')
 if API_KEY is None:
-    raise Exception("API_KEY not found in .env file")
+    raise Exception("API_KEY not found in .env file. Please re-configure")
 
 
 def get_game_id(game_name: str) -> Dict[str, Optional[str]]:
@@ -76,9 +76,9 @@ def get_game_info(game_id: str) -> Dict:
 
 def get_original_price(game_name: str, country: str, platform: str) -> Dict:
     url = "https://api.isthereanydeal.com/games/prices/v3"
+    if not (is_valid_iso2_country_code(country)):
+        raise ValueError("Not a valid country code")
     game_id = get_game_id(game_name)
-    if not API_KEY:
-        raise Exception("API Key is missing. Check your .env file or environment configuration")
 
     # Set up the query parameters
     params = {
@@ -127,75 +127,75 @@ def get_original_price(game_name: str, country: str, platform: str) -> Dict:
 
 def current_best_deal(game_name: str, country: str, platform: str) -> List[Dict]:
     url = "https://api.isthereanydeal.com/games/prices/v3"
+    if not (is_valid_iso2_country_code(country)):
+        raise ValueError("Not a valid country code")
     game_id = get_game_id(game_name)
-    if not API_KEY:
-        raise Exception("API key is missing. Check your .env file or environment configuration.")
+
+    # Set up the query parameters
+    params = {
+        "key": API_KEY,
+        "country": country
+    }
+
+    # The body of the POST request contains the game_id as a list
+    body = [
+        game_id
+    ]
+
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    logging.info("Request URL: %s", url)
+    logging.info("Request Params: %s", params)
+    logging.info("Request Headers: %s", headers)
+    logging.info("Request Body: %s", body)
+
+    # Send POST request to the API
+    response = requests.post(url, params=params, json=body, headers=headers)
+
+    # Raise an error if the request failed
+    if response.status_code != 200:
+        raise Exception(f"API request failed with status code {response.status_code}: {response.text}")
+
+    # Parse the response JSON
+    data = response.json()
+
+    # Ensure that the data is a list and access the first element
+    if isinstance(data, list) and data:
+        game_data = data[0]  # Access the first dictionary in the list
     else:
-        # Set up the query parameters
-        params = {
-            "key": API_KEY,
-            "country": country
-        }
+        raise Exception(f"No data found for the game '{game_id}' in country '{country}'.")
 
-        # The body of the POST request contains the game_id as a list
-        body = [
-            game_id
-        ]
+    # Filter deals based on the platform
+    filtered_deals = []
+    deals = game_data.get("deals", [])
 
-        headers = {
-            "Content-Type": "application/json"
-        }
+    # Get the minimum price for the specified platform
+    min_price = None
+    for deal in deals:
+        platforms = [p["name"] for p in deal["platforms"]]
+        if platform in platforms:
+            price = deal["price"]["amount"]
+            if min_price is None or price < min_price:
+                min_price = price
 
-        logging.info("Request URL: %s", url)
-        logging.info("Request Params: %s", params)
-        logging.info("Request Headers: %s", headers)
-        logging.info("Request Body: %s", body)
+    # Collect all deals that match the minimum price and return only relevant data
+    result = []
+    for deal in deals:
+        platforms = [p["name"] for p in deal["platforms"]]
+        if platform in platforms and deal["price"]["amount"] == min_price:
+            result.append({
+                "store_name": deal["shop"]["name"],
+                "currency": deal["price"]["currency"],
+                "current_price": deal["price"]["amount"],
+                "original_price": deal["regular"]["amount"],
+                "url": deal["url"],
+                "timestamp": deal["timestamp"]
+            })
 
-        # Send POST request to the API
-        response = requests.post(url, params=params, json=body, headers=headers)
-
-        # Raise an error if the request failed
-        if response.status_code != 200:
-            raise Exception(f"API request failed with status code {response.status_code}: {response.text}")
-
-        # Parse the response JSON
-        data = response.json()
-
-        # Ensure that the data is a list and access the first element
-        if isinstance(data, list) and data:
-            game_data = data[0]  # Access the first dictionary in the list
-        else:
-            raise Exception(f"No data found for the game '{game_id}' in country '{country}'.")
-
-        # Filter deals based on the platform
-        filtered_deals = []
-        deals = game_data.get("deals", [])
-
-        # Get the minimum price for the specified platform
-        min_price = None
-        for deal in deals:
-            platforms = [p["name"] for p in deal["platforms"]]
-            if platform in platforms:
-                price = deal["price"]["amount"]
-                if min_price is None or price < min_price:
-                    min_price = price
-
-        # Collect all deals that match the minimum price and return only relevant data
-        result = []
-        for deal in deals:
-            platforms = [p["name"] for p in deal["platforms"]]
-            if platform in platforms and deal["price"]["amount"] == min_price:
-                result.append({
-                    "store_name": deal["shop"]["name"],
-                    "currency": deal["price"]["currency"],
-                    "current_price": deal["price"]["amount"],
-                    "original_price": deal["regular"]["amount"],
-                    "url": deal["url"],
-                    "timestamp": deal["timestamp"]
-                })
-
-        # Return the filtered list of stores with relevant data
-        return result
+    # Return the filtered list of stores with relevant data
+    return result
 
 
 def get_current_lowest_price(game_id: str, country: str, platform: str) -> Dict:
@@ -219,7 +219,7 @@ def get_all_time_low_price(game_name: str, country: str) -> Dict:
         Dict: A dictionary containing the all-time lowest price information, if available.
     """
     if not (is_valid_iso2_country_code(country)):
-        return ValueError
+        return ValueError("Not a valid country code")
     game_id = get_game_id(game_name)
     url = "https://api.isthereanydeal.com/games/prices/v3"
 

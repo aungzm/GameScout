@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  mybot:
+    build:
+      context: .
+    container_name: mybot-container
+    environment:
+      - API_KEY={Your Isthereanydeal API key}
+      - DB_FILE={Your sqlite file name}
+      - DISCORD_TOKEN={Your discord toke}
+    volumes:
+      - ./data:/app/
+    restart: always

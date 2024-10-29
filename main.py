@@ -1,5 +1,7 @@
+from datetime import datetime
 from typing import List, Dict, Optional
 
+import asyncio
 import discord
 from discord.ext import commands, tasks
 import os
@@ -308,6 +310,15 @@ async def game_info(ctx, game_name: str):
         await ctx.send(f"No information found for game '{game_name}'.")
 
 
+async def start_check_price_watches(ctx):
+    # Calculate the delay to the next full hour
+    now = datetime.now()
+    delay = (60 - now.minute) * 60 - now.second  # Delay until the next full hour
+
+    await asyncio.sleep(delay)
+    check_price_watches.start(ctx)
+
+
 @tasks.loop(hours=1)
 async def check_price_watches(ctx):
     """
@@ -339,12 +350,14 @@ async def check_price_watches(ctx):
 
             elif watch_type == "discount":
                 if percentage_compare(current_price, original_price, target_value):
-                    await ctx.send(f"{game_name} is available at a {target_value}% discount! Current price: {current_price}.")
+                    await ctx.send(
+                        f"{game_name} is available at a {target_value}% discount! Current price: {current_price}.")
                     await ctx.send(get_best_deal_now(game_name, country, platform))
 
             elif watch_type == "lower than":
                 if target_value and is_below_target_price(current_price, target_value):
-                    await ctx.send(f"{game_name} is now below your target price of {target_value}. Current price: {current_price}.")
+                    await ctx.send(
+                        f"{game_name} is now below your target price of {target_value}. Current price: {current_price}.")
                     await ctx.send(get_lowest_now(game_id, country))
 
         except Exception as e:

@@ -1,0 +1,23 @@
+# Exclude the virtual environment
+venv/
+
+# Exclude Git files
+.git
+.gitignore
+
+# Exclude test files and data
+tests/
+*.md
+*.log
+
+# Exclude local configuration files
+__pycache__/
+.env
+
+# Docker configuration files
+Dockerfile
+.dockerignore
+
+# Database files (sqlite)
+*.sqlite
+*.db

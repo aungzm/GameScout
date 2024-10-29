@@ -6,9 +6,10 @@ import os
 from dotenv import load_dotenv
 import logging
 from cron_descriptor import get_description
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-from api import get_all_time_low_price, get_current_lowest_price, get_game_id, current_best_deal
+from api import get_all_time_low_price, get_current_lowest_price, get_game_id, current_best_deal, get_original_price
 from compare import percentage_compare, is_below_target_price, all_time_low_compare
 from dbdriver import retrieve_current_hour_watches, add_game_watch, retrieve_all_watches, \
     delete_game_watch_by_name, delete_game_watch_by_id, update_game_watch, retrieve_game_names, \
@@ -36,29 +37,23 @@ async def on_ready():
 
 
 @bot.command(name="add_watch")
-async def add_watch(ctx, game_name: str, country: str, watch_type: str, schedule: str, max_price: Optional[str] = None,
-                    discount_percentage: Optional[str] = None):
+async def add_watch(ctx, game_name: str, country: str, watch_type: str, schedule: str,
+                    target_value: Optional[str] = None, platform: str = "Windows"):
     """
     Adds a new game watch.
-    Usage: !add_watch <game_name> <country> <watch_type> <schedule> [max_price] [discount_percentage]
+    Usage: !add_watch <game_name> <country> <watch_type> <schedule> [target_value] [platform]
     """
     game_id = get_game_id(game_name)
-
-    # Rearrange `max_price` and `discount_percentage` if `watch_type` is "discount"
-    if watch_type.lower() == "discount":
-        discount_percentage = max_price  # Use max_price as discount_percentage
-        max_price = None
 
     if game_id is None:
         await ctx.send("Could not find game with such name.")
         return
 
-    # Convert max_price and discount_percentage to float if provided
+    # Convert target_value to float if provided
     try:
-        max_price = float(max_price) if max_price else None
-        discount_percentage = float(discount_percentage) if discount_percentage else None
+        target_value = float(target_value) if target_value else None
     except ValueError:
-        await ctx.send("Invalid input: max_price and discount_percentage must be valid numbers.")
+        await ctx.send("Invalid input: target_value must be a valid number.")
         return
 
     # Normalize and validate watch_type
@@ -66,6 +61,12 @@ async def add_watch(ctx, game_name: str, country: str, watch_type: str, schedule
     allowed_watch_types = ['all time low', 'lower than', 'discount']
     if normalized_watch_type not in allowed_watch_types:
         await ctx.send("Not a valid watch type. Allowed types are: **all time low**, **lower than**, **discount**.")
+        return
+
+    # Validate platform
+    allowed_platforms = ['Windows', 'MacOS', 'PS5', 'Xbox', 'Switch']
+    if platform not in allowed_platforms:
+        await ctx.send(f"Invalid platform '{platform}'. Allowed platforms are: {', '.join(allowed_platforms)}.")
         return
 
     # Add the game watch
@@ -76,24 +77,24 @@ async def add_watch(ctx, game_name: str, country: str, watch_type: str, schedule
             country=country,
             price_watch_type=normalized_watch_type,
             schedule=schedule,
-            max_price=max_price,
-            discount_percentage=discount_percentage
+            target_value=target_value,
+            platform=platform
         )
-        await ctx.send(f"Added watch for {game_name} with type '{watch_type}' scheduled at {get_description(schedule)}!")
+        await ctx.send(
+            f"Added watch for {game_name} with type '{watch_type}' on {platform} scheduled at {get_description(schedule)}!"
+        )
     except ValueError as e:
         await ctx.send(str(e))
-        if "Not a valid watch type" in str(e):
-            await ctx.send("Watch type must be one of **all time low**, **lower than**, **discount**")
     except FileExistsError as e:
         await ctx.send(str(e))
 
 
 @bot.command(name="update_watch")
 async def update_watch(ctx, game_name: str, country: str, watch_type: str = None, schedule: str = None,
-                       max_price: Optional[float] = None, discount_percentage: Optional[float] = None):
+                       target_value: Optional[float] = None, platform: Optional[str] = None):
     """
     Updates an existing game watch by game ID.
-    Usage: !update_watch <game_name> <watch_type> <schedule> [max_price] [discount_percentage]
+    Usage: !update_watch <game_name> <country> <watch_type> <schedule> [target_value] [platform]
     """
     # Fetch the game ID based on game name
     game_id = get_game_id(game_name)
@@ -101,29 +102,29 @@ async def update_watch(ctx, game_name: str, country: str, watch_type: str = None
         await ctx.send("Could not find game with such name.")
         return
 
-    # Rearrange `max_price` to `discount_percentage` if `watch_type` is "discount"
-    if watch_type and watch_type.lower() == "discount":
-        discount_percentage = max_price  # Assign `max_price` input to `discount_percentage`
-        max_price = None  # Clear `max_price` since it's not used for discount type
-
-    # Convert to float if values are provided, handling potential conversion issues
+    # Convert target_value to float if provided
     try:
-        max_price = float(max_price) if max_price is not None else None
-        discount_percentage = float(discount_percentage) if discount_percentage is not None else None
+        target_value = float(target_value) if target_value is not None else None
     except ValueError:
-        await ctx.send("Invalid input: max_price and discount_percentage must be valid numbers.")
+        await ctx.send("Invalid input: target_value must be a valid number.")
         return
 
+    # Validate platform if provided
+    allowed_platforms = ['Windows', 'MacOS', 'PS5', 'Xbox', 'Switch']
+    if platform and platform not in allowed_platforms:
+        await ctx.send(f"Invalid platform '{platform}'. Allowed platforms are: {', '.join(allowed_platforms)}.")
+        return
+
+    # Call the update function
     try:
-        # Call the update function
         update_game_watch(
             game_id=game_id,
             game_name=game_name,
             price_watch_type=watch_type,
             cron_schedule=schedule,
             country=country,
-            max_price=max_price,
-            discount_percentage=discount_percentage
+            target_value=target_value,
+            platform=platform
         )
         await ctx.send(f"Updated watch for {game_name}.")
     except ValueError as e:
@@ -245,13 +246,19 @@ async def list_all_info(ctx):
 
     :param ctx: Context of the command
     """
-    game_info = retrieve_all_info()
-    if game_info:
-        response = "\n\n".join([f"ID: {info['id']}, Game: {info['game_name']}, Type: {info['price_watch_type']}, "
-                                f"Schedule: {info['cron_schedule']}, "
-                                f"Country: {info['country']}, Max Price: {info.get('max_price', 'N/A')}, "
-                                f"Discount: {info.get('discount_percentage', 'N/A')}"
-                                for info in game_info])
+    game_information = retrieve_all_info()
+    if game_information:
+        response = "\n\n".join([
+            f"**Game Watch Entry #{info['id']}**\n"
+            f"**Game Name:** {info['game_name']}\n"
+            f"**Watch Type:** {info['price_watch_type'].capitalize()}\n"
+            f"**Schedule:** {info['cron_schedule']}\n"
+            f"**Country:** {info['country']}\n"
+            f"**Max Price:** {info.get('max_price', 'N/A')}\n"
+            f"**Discount Percentage:** {info.get('discount_percentage', 'N/A')}\n"
+            f"------------------------"
+            for info in game_information
+        ])
     else:
         response = "No game watch entries found."
     await ctx.send(response)
@@ -302,46 +309,43 @@ async def game_info(ctx, game_name: str):
 
 
 @tasks.loop(hours=1)
-async def check_price_watches():
+async def check_price_watches(ctx):
     """
     Periodically checks for watches scheduled for the current hour.
     """
     current_hour_watches = retrieve_current_hour_watches()
 
-    for game_id, game_name, watch_type, user_name, country in current_hour_watches:
+    for game_id, game_name, country, watch_type, target_value, platform in current_hour_watches:
         try:
             # Get the current lowest price
-            current_prices = get_current_lowest_price(game_id, country, platform="Windows")  # Platform can be dynamic
+            current_price_data = get_current_lowest_price(game_id, country, platform).get("current_price")
+            currency = current_price_data.get("currency")
+            current_price = current_price_data.get("current_price")
+            original_price = get_original_price(game_name, country, platform).get("original_price")
 
-            if not current_prices:
+            if not current_price:
                 print(f"No current prices found for {game_name}.")
-                continue
-
-            # Choose the first price for simplicity
-            current_price_data = current_prices[0]
-            current_price = current_price_data["current_price"]
-            original_price = current_price_data["original_price"]
+                raise ValueError("Can't find current prices")
+            if not original_price:
+                raise ValueError("Can't find original price")
 
             # Determine action based on watch_type
             if watch_type == "all time low":
-                all_time_low = get_all_time_low_price(game_id, country)
-                if all_time_low and all_time_low_compare(current_price, all_time_low["price"]):
+                all_time_low = get_all_time_low_price(game_id, country).get("price")
+                if all_time_low and all_time_low_compare(current_price, all_time_low):
                     print(
-                        f"{game_name} is at its all-time low price of {all_time_low['price']} {all_time_low['currency']}!")
+                        f"{game_name} is at its all-time low price of {all_time_low} {currency}!")
                     print(get_lowest_now(game_id, country))
 
             elif watch_type == "discount":
-                discount_percentage = current_price_data.get("discount_percentage", 0)
-                if percentage_compare(current_price, original_price, discount_percentage):
-                    print(
-                        f"{game_name} is available at a {discount_percentage}% discount! Current price: {current_price}.")
-                    print(get_lowest_now(game_id, country))
+                if percentage_compare(current_price, original_price, target_value):
+                    await ctx.send(f"{game_name} is available at a {target_value}% discount! Current price: {current_price}.")
+                    await ctx.send(get_best_deal_now(game_name, country, platform))
 
             elif watch_type == "lower than":
-                max_price = current_price_data.get("max_price", None)
-                if max_price and is_below_target_price(current_price, max_price):
-                    print(f"{game_name} is now below your target price of {max_price}. Current price: {current_price}.")
-                    print(get_lowest_now(game_id, country))
+                if target_value and is_below_target_price(current_price, target_value):
+                    await ctx.send(f"{game_name} is now below your target price of {target_value}. Current price: {current_price}.")
+                    await ctx.send(get_lowest_now(game_id, country))
 
         except Exception as e:
             print(f"Error checking price for {game_name}: {e}")

@@ -18,7 +18,7 @@ def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
 
-    # Create the game_watch table with new fields for max_price and discount_percentage
+    # Create the game_watch table with a single target_value field
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS game_watch (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,8 +27,8 @@ def init_db():
         price_watch_type TEXT NOT NULL,
         cron_schedule TEXT NOT NULL, 
         country TEXT NOT NULL DEFAULT "US",
-        max_price REAL DEFAULT NULL,
-        discount_percentage REAL DEFAULT NULL
+        target_value REAL DEFAULT NULL,
+        platform TEXT 
         );
     ''')
 
@@ -37,8 +37,7 @@ def init_db():
 
 
 def add_game_watch(game_id: str, game_name: str, price_watch_type: str, schedule: str,
-                   country: str = "US", max_price: Optional[float] = None,
-                   discount_percentage: Optional[float] = None) -> None:
+                   country: str = "US", target_value: Optional[float] = None, platform: str = "Windows") -> None:
     """
     Adds a game watch entry to the database with validation on watch type and cron schedule.
 
@@ -48,8 +47,8 @@ def add_game_watch(game_id: str, game_name: str, price_watch_type: str, schedule
         price_watch_type (str): The type of price watch (e.g., 'all time low', 'lower than', 'discount').
         schedule (str): The cron schedule string (e.g., '*/5 * * * *').
         country (str): The country code for the watch, default is "US".
-        max_price (Optional[float]): The maximum price for "lower than" watch type.
-        discount_percentage (Optional[float]): The percentage discount for "discount" watch type.
+        target_value (Optional[float]): Represents either max_price or discount_percentage, depending on `price_watch_type`
+        platform (Optional[str]): What platform is the game on MacOS, PS5, Windows etc. Default is Windows
     """
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -66,13 +65,13 @@ def add_game_watch(game_id: str, game_name: str, price_watch_type: str, schedule
     if price_watch_type not in allowed_watch_types:
         raise ValueError("Not a valid watch type. Allowed types are: 'all time low', 'lower than', 'discount'.")
 
-    # Validate watch-specific fields
-    if price_watch_type == "lower than" and max_price is None:
-        raise ValueError("max_price is required for 'lower than' watch type.")
-    if price_watch_type == "discount" and discount_percentage is None:
-        raise ValueError("discount_percentage is required for 'discount' watch type.")
-    if not schedule:
-        raise ValueError("Schedule is required.")
+    # Validate target_value based on watch type
+    if price_watch_type == "lower than" and target_value is None:
+        raise ValueError("target_value is required as max_price for 'lower than' watch type.")
+    if price_watch_type == "discount" and target_value is None:
+        raise ValueError("target_value is required as discount_percentage for 'discount' watch type.")
+    if price_watch_type == "all time low" and target_value is not None:
+        raise ValueError("'all time low' watch type should not have a target_value.")
 
     # Validate cron schedule and generate a description
     try:
@@ -84,9 +83,9 @@ def add_game_watch(game_id: str, game_name: str, price_watch_type: str, schedule
 
     # Insert the game watch into the database
     cursor.execute('''
-        INSERT INTO game_watch (game_id, game_name, price_watch_type, cron_schedule, country, max_price, discount_percentage)
+        INSERT INTO game_watch (game_id, game_name, price_watch_type, cron_schedule, country, target_value, platform)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (game_id, game_name, price_watch_type, schedule, country, max_price, discount_percentage))
+    ''', (game_id, game_name, price_watch_type, schedule, country, target_value, platform))
 
     conn.commit()
     conn.close()
@@ -98,11 +97,20 @@ def update_game_watch(
         price_watch_type: Optional[str] = None,
         cron_schedule: Optional[str] = None,
         country: Optional[str] = None,
-        max_price: Optional[float] = None,
-        discount_percentage: Optional[float] = None
+        target_value: Optional[float] = None,
+        platform: Optional[str] = None
 ) -> None:
     """
     Updates a game watch entry in the database based on the provided game ID and fields.
+
+    Args:
+        game_id (str): The unique ID of the game.
+        game_name (Optional[str]): The new name of the game.
+        price_watch_type (Optional[str]): The new type of price watch ('all time low', 'lower than', 'discount').
+        cron_schedule (Optional[str]): The new schedule for checking the price.
+        country (Optional[str]): The new country code for the watch.
+        target_value (Optional[float]): Represents either max_price or discount_percentage, depending on `price_watch_type`.
+        platform (Optional[str]): The platform for the game (e.g., 'Windows', 'MacOS', 'PS5').
     """
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -118,20 +126,18 @@ def update_game_watch(
         raise ValueError(
             f"Invalid price_watch_type '{price_watch_type}'. Allowed types are: {', '.join(allowed_watch_types)}.")
 
-    # Validate fields based on watch type
-    if price_watch_type == "lower than":
-        if max_price is None:
-            raise ValueError("max_price is required for 'lower than' watch type.")
-        if discount_percentage is not None:
-            raise ValueError("discount_percentage should not be provided for 'lower than' watch type.")
-    elif price_watch_type == "discount":
-        if discount_percentage is None:
-            raise ValueError("discount_percentage is required for 'discount' watch type.")
-        if max_price is not None:
-            raise ValueError("max_price should not be provided for 'discount' watch type.")
-    elif price_watch_type == "all time low":
-        if max_price is not None or discount_percentage is not None:
-            raise ValueError("'all time low' watch type should not have max_price or discount_percentage.")
+    # Allowed platforms (optional validation)
+    allowed_platforms = ['Windows', 'MacOS', 'PS5', 'Xbox', 'Switch']
+    if platform and platform not in allowed_platforms:
+        raise ValueError(f"Invalid platform '{platform}'. Allowed platforms are: {', '.join(allowed_platforms)}.")
+
+    # Validate target_value based on watch type
+    if price_watch_type == "lower than" and target_value is None:
+        raise ValueError("target_value is required as max_price for 'lower than' watch type.")
+    if price_watch_type == "discount" and target_value is None:
+        raise ValueError("target_value is required as discount_percentage for 'discount' watch type.")
+    if price_watch_type == "all time low" and target_value is not None:
+        raise ValueError("'all time low' watch type should not have a target_value.")
 
     # Prepare fields to update based on provided values
     fields_to_update: Dict[str, Any] = {}
@@ -143,10 +149,10 @@ def update_game_watch(
         fields_to_update["cron_schedule"] = cron_schedule
     if country:
         fields_to_update["country"] = country
-    if max_price is not None:
-        fields_to_update["max_price"] = max_price
-    if discount_percentage is not None:
-        fields_to_update["discount_percentage"] = discount_percentage
+    if target_value is not None:
+        fields_to_update["target_value"] = target_value
+    if platform:
+        fields_to_update["platform"] = platform
 
     # Build the update query dynamically
     set_clause = ", ".join([f"{field} = ?" for field in fields_to_update.keys()])
@@ -161,6 +167,7 @@ def update_game_watch(
 
     conn.commit()
     conn.close()
+
 
 
 def retrieve_game_names() -> List[str]:
@@ -304,7 +311,7 @@ def retrieve_all_watches() -> List[Tuple[str, str, str, str, str]]:
     return watches
 
 
-def retrieve_current_hour_watches() -> List[Tuple[str, str, str]]:
+def retrieve_current_hour_watches() -> List[Tuple[str, str, str, str, str, str]]:
     """
     Retrieves game watches scheduled for the current hour.
 
@@ -318,21 +325,20 @@ def retrieve_current_hour_watches() -> List[Tuple[str, str, str]]:
     cursor = conn.cursor()
 
     # Fetch all entries with their cron schedule
-    cursor.execute('SELECT game_id, game_name, price_watch_type, cron_schedule FROM game_watch')
+    cursor.execute('SELECT game_id, game_name, country, price_watch_type, cron_schedule, target_value, platform FROM '
+                   'game_watch')
     games = []
 
     for row in cursor.fetchall():
-        game_id, game_name, price_watch_type, cron_schedule = row
+        game_id, game_name, country, price_watch_type, cron_schedule, target_value, platform = row
 
         # Use croniter to check if the next or previous run falls within the current hour
         cron = croniter(cron_schedule, previous_hour)
         next_run = cron.get_next(datetime)
 
-        print(f"cron_schedule: {cron_schedule}, next_run: {next_run}, current_hour: {current_hour}")  # Debug print
-
         # Check if the next or previous run falls within the current hour
         if next_run.hour == current_hour.hour and next_run.date() == current_hour.date():
-            games.append((game_id, game_name, price_watch_type))
+            games.append((game_id, game_name, country, price_watch_type, target_value, platform))
 
     conn.close()
     return games

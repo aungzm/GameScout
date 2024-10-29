@@ -1,3 +1,4 @@
+from collections import Counter
 from typing import List, Dict, Optional
 import requests
 import os
@@ -71,6 +72,57 @@ def get_game_info(game_id: str) -> Dict:
 
     # Return the JSON response containing game information
     return response.json()
+
+
+def get_original_price(game_name: str, country: str, platform: str) -> Dict:
+    url = "https://api.isthereanydeal.com/games/prices/v3"
+    game_id = get_game_id(game_name)
+    if not API_KEY:
+        raise Exception("API Key is missing. Check your .env file or environment configuration")
+
+    # Set up the query parameters
+    params = {
+        "key": API_KEY,
+        "country": country
+    }
+
+    # The body of the POST request contains the game_id as a list
+    body = [game_id]
+    headers = {"Content-Type": "application/json"}
+
+    logging.info("Request URL: %s", url)
+    logging.info("Request Params: %s", params)
+    logging.info("Request Headers: %s", headers)
+    logging.info("Request Body: %s", body)
+
+    response = requests.post(url, params=params, json=body, headers=headers)
+
+    # Raise an error if the request failed
+    if response.status_code != 200:
+        raise Exception(f"API request failed with status code {response.status_code}: {response.text}")
+
+    data = response.json()
+
+    # Access nested game data within the response
+    if isinstance(data, list) and data:
+        game_data = data[0]  # Access the first dictionary in the list
+    else:
+        raise Exception(f"No data found for the game '{game_id}' in country '{country}'.")
+
+    # Collect all regular prices from the deals
+    regular_prices = []
+    currency = game_data.get("deals", [])[0]["price"]["currency"]
+    for deal in game_data.get("deals", []):
+        regular_price = deal.get("regular", {}).get("amount")
+        if regular_price is not None:
+            regular_prices.append(regular_price)
+    # Calculate the mode (most common value) as the original price
+    if not regular_prices:
+        raise Exception("No regular prices found in the deals.")
+
+    original_price = Counter(regular_prices).most_common(1)[0][0]
+    logging.info(f"Most common original price: {original_price}")
+    return {"original_price": original_price, "currency": currency}
 
 
 def current_best_deal(game_name: str, country: str, platform: str) -> List[Dict]:

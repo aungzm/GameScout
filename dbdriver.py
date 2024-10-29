@@ -1,9 +1,10 @@
 import sqlite3
-from datetime import datetime
 from typing import List, Tuple, Optional, Dict, Any
 from dotenv import load_dotenv
 import os
 from cron_descriptor import get_description
+from croniter import croniter
+from datetime import datetime, timedelta
 
 DB_FILE = os.getenv("DB_FILE")
 
@@ -92,7 +93,7 @@ def add_game_watch(game_id: str, game_name: str, price_watch_type: str, schedule
 
 
 def update_game_watch(
-        game_id: int,
+        game_id: str,
         game_name: Optional[str] = None,
         price_watch_type: Optional[str] = None,
         cron_schedule: Optional[str] = None,
@@ -103,11 +104,10 @@ def update_game_watch(
     """
     Updates a game watch entry in the database based on the provided game ID and fields.
     """
-    # Connect to the database
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
 
-    # Check if the game watch entry exists
+    # Check if the game watch entry exists using game_id
     cursor.execute('SELECT * FROM game_watch WHERE game_id = ?', (game_id,))
     if not cursor.fetchone():
         raise FileNotFoundError(f"No game watch entry found with ID {game_id}")
@@ -152,11 +152,11 @@ def update_game_watch(
     set_clause = ", ".join([f"{field} = ?" for field in fields_to_update.keys()])
     values = list(fields_to_update.values()) + [game_id]  # Values for placeholders
 
-    # Execute the update query
+    # Execute the update query with `game_id` in the WHERE clause
     cursor.execute(f'''
         UPDATE game_watch
         SET {set_clause}
-        WHERE id = ?
+        WHERE game_id = ?
     ''', values)
 
     conn.commit()
@@ -304,23 +304,35 @@ def retrieve_all_watches() -> List[Tuple[str, str, str, str, str]]:
     return watches
 
 
-def retrieve_current_hour_watches() -> List[Tuple[str, str, str, str]]:
+def retrieve_current_hour_watches() -> List[Tuple[str, str, str]]:
     """
     Retrieves game watches scheduled for the current hour.
 
     Returns:
-        List[Tuple[str, str, str, str]]: A list of tuples containing game ID, game name, watch type, and user for each scheduled game.
+        List[Tuple[str, str, str]]: A list of tuples containing game ID, game name, and watch type for each scheduled game.
     """
-    current_hour = datetime.now().strftime("%H:00")
+    current_time = datetime.now()
+    current_hour = current_time.replace(minute=0, second=0, microsecond=0)
+    previous_hour = current_hour - timedelta(hours=1)  # Include the previous hour for matching
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
 
-    cursor.execute('''
-        SELECT game_id, game_name, price_watch_type
-        FROM game_watch
-        WHERE cron_schedule = ?
-    ''', (current_hour,))
+    # Fetch all entries with their cron schedule
+    cursor.execute('SELECT game_id, game_name, price_watch_type, cron_schedule FROM game_watch')
+    games = []
 
-    games = cursor.fetchall()
+    for row in cursor.fetchall():
+        game_id, game_name, price_watch_type, cron_schedule = row
+
+        # Use croniter to check if the next or previous run falls within the current hour
+        cron = croniter(cron_schedule, previous_hour)
+        next_run = cron.get_next(datetime)
+
+        print(f"cron_schedule: {cron_schedule}, next_run: {next_run}, current_hour: {current_hour}")  # Debug print
+
+        # Check if the next or previous run falls within the current hour
+        if next_run.hour == current_hour.hour and next_run.date() == current_hour.date():
+            games.append((game_id, game_name, price_watch_type))
+
     conn.close()
     return games

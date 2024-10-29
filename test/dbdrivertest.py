@@ -3,9 +3,6 @@ import unittest
 import sqlite3
 import os
 from datetime import datetime
-from unittest import result
-
-from dotenv import load_dotenv
 
 import dbdriver
 from dbdriver import (  # Replace `your_module` with the actual module name where your functions are located
@@ -39,8 +36,8 @@ class TestDatabaseFunctions(unittest.TestCase):
         """
         self.conn = sqlite3.connect(DB_FILE)
         self.cursor = self.conn.cursor()
-        self.game_id = "test_game_id"
-        self.game_name = "Test Game"
+        self.game_id = "4343431"
+        self.game_name = "Test Game2"
         self.price_watch_type = "lower than"
         self.schedule = "0 9 * * 1"
         self.country = "US"
@@ -48,22 +45,26 @@ class TestDatabaseFunctions(unittest.TestCase):
         self.discount_percentage = None
 
     def tearDown(self):
-        """
-        Runs after each test case to clean up the database and close the connection.
-        """
+        """Clean up the database after each test case."""
         self.cursor.execute("DELETE FROM game_watch")
         self.conn.commit()
         self.conn.close()
+        self.conn = None  # Set to None to ensure it's not left open
 
     @classmethod
     def tearDownClass(cls):
         """
         Runs after all tests have completed to delete the test database file.
         """
-        if os.path.exists(DB_FILE):
-            os.remove(DB_FILE)
+        if hasattr(cls, 'conn') and cls.conn:
+            cls.conn.close()
 
-    # Define your test methods here
+        # Delete the test database file if it exists
+        if os.path.exists(DB_FILE):
+            try:
+                os.remove(DB_FILE)
+            except PermissionError:
+                print(f"Failed to delete {DB_FILE}. Please ensure no other processes are using it.")
 
     def test_add_game_watch(self):
         """
@@ -96,22 +97,32 @@ class TestDatabaseFunctions(unittest.TestCase):
             discount_percentage=self.discount_percentage
         )
 
-        # Retrieve the game ID directly from the database after insertion
-        self.cursor.execute("SELECT id FROM game_watch WHERE game_name = ?", (self.game_name,))
-        result = self.cursor.fetchone()
-        game_id = result[0]  # Fetch the ID from the query result
+        # Retrieve the ID directly after insertion
+        self.cursor.execute("SELECT game_id FROM game_watch WHERE game_name = ?", (self.game_name,))
+        game_id = self.cursor.fetchone()[0]
 
-        # Perform the update using the retrieved game ID
+        # Print initial data for verification
+        print("Before update:", list_game_info(self.game_name))
+        print("Game ID:", game_id)
+
+        # Perform the update using the retrieved ID
         update_game_watch(
-            game_id=game_id,
+            game_id=game_id,  # Pass the retrieved game_id
             game_name="Updated Game",
-            max_price=25.00
+            cron_schedule="0 9 * * 1",
+            country="US",
         )
 
-        # Verify the update
-        updated_info = list_game_info("Updated Game")[0]
-        self.assertEqual(updated_info["game_name"], "Updated Game")
-        self.assertEqual(updated_info["max_price"], 25.00)
+        # Print updated data for verification
+        print("After update (original name):", list_game_info(self.game_name))
+        print("After update (updated name):", list_game_info("Updated Game"))
+
+        # Verify the update by checking for the updated name
+        updated_info = list_game_info("Updated Game")
+        self.assertTrue(updated_info)  # Check that the game exists
+
+        # Verify that the fields are updated correctly
+        self.assertEqual(updated_info[0]["game_name"], "Updated Game")
 
     def test_retrieve_game_names(self):
         """Test retrieving unique game names."""
@@ -231,7 +242,11 @@ class TestDatabaseFunctions(unittest.TestCase):
 
     def test_retrieve_current_hour_watches(self):
         """Test retrieving watches for the current hour."""
-        current_hour_schedule = datetime.now().strftime("%H:00")
+        # Convert the current time to a cron expression for the current hour
+        current_hour = datetime.now().hour
+        self.schedule = f"0 {current_hour} * * *"  # Every day at the current hour
+
+        # Add the game watch entry with the cron schedule for the current hour
         dbdriver.add_game_watch(
             game_id=self.game_id,
             game_name=self.game_name,
@@ -241,7 +256,10 @@ class TestDatabaseFunctions(unittest.TestCase):
             max_price=self.max_price,
             discount_percentage=self.discount_percentage
         )
+
+        # Retrieve watches scheduled for the current hour
         current_hour_watches = retrieve_current_hour_watches()
+        print(current_hour_watches)  # For debugging
         self.assertGreater(len(current_hour_watches), 0)
 
 

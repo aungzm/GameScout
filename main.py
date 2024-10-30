@@ -18,7 +18,6 @@ from dbdriver import retrieve_current_hour_watches, add_game_watch, retrieve_all
     retrieve_all_info, init_db, retrieve_schedule_for_game, list_game_info
 
 # Load environment variables
-load_dotenv()
 DB_FILE = os.getenv("DB_FILE")
 TOKEN = os.getenv("DISCORD_TOKEN")
 API_KEY = os.getenv("API_KEY")
@@ -35,7 +34,6 @@ async def on_ready():
     print(f"Logged in as {bot.user} (ID: {bot.user.id})")
     print("------")
     init_db()
-    check_price_watches.start()  # Start the scheduled task directly without parentheses
 
 
 @bot.command(name="add_watch")
@@ -150,7 +148,7 @@ async def delete_watch(ctx, identifier: str):
         await ctx.send(f"Failed to delete watch: {e}")
 
 
-@bot.command(name="all_game_names")
+@bot.command(name="all_games")
 async def list_all_game_watched(ctx):
     """
     Lists all unique game names being watched.
@@ -165,7 +163,7 @@ async def list_all_game_watched(ctx):
     await ctx.send(response)
 
 
-@bot.command(name="get_lowest_now")
+@bot.command(name="get_lowest")
 async def get_lowest_now(ctx, name: str, country: str, platform: str):
     """
     Fetch and display the lowest game price from IsThereAnyDeal API for a given game name, country, and platform.
@@ -204,7 +202,7 @@ async def get_all_time_low_now(ctx, name: str, country: str):
     await ctx.send(f"{price_dict.get('price')} {price_dict.get('currency')}")
 
 
-@bot.command(name="get_best_deal_now")
+@bot.command(name="get_best_deal")
 async def get_best_deal_now(ctx, name: str, country: str, platform: str):
     """
 
@@ -241,7 +239,7 @@ async def get_best_deal_now(ctx, name: str, country: str, platform: str):
     await ctx.send(message)
 
 
-@bot.command(name="list_all_info")
+@bot.command(name="list_all")
 async def list_all_info(ctx):
     """
     Lists all detailed information for each game watch entry.
@@ -310,6 +308,7 @@ async def game_info(ctx, game_name: str):
         await ctx.send(f"No information found for game '{game_name}'.")
 
 
+@bot.command(name="start_watch")
 async def start_check_price_watches(ctx):
     # Calculate the delay to the next full hour
     now = datetime.now()

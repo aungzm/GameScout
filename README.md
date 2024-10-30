@@ -48,6 +48,7 @@ Create a .env file from sample-env, then in the same repository, pull the docker
 ```bash
 docker run -d --env-file .env --name gamescout aungzm/gamescout:latest
 ```
+Or simply use docker-compose:
 ```docker-compose.yml
 services:
   gamescout:
@@ -66,19 +67,19 @@ services:
 ```
 # Bot Commands
 
-| Command           | Description                                                  | Example Usage                                                    |   |
-|-------------------|--------------------------------------------------------------|------------------------------------------------------------------|---|
-| !add_watch        | Add a game watch with specified criteria.                    | !add_watch "Game Name" "US" "discount" "0 9 * * *" 25 "Windows"  |   |
-| !update_watch     | Update an existing game watch by game ID or name.            | !update_watch "Game Name" "US" "lower than" "0 8 * * *" 30 "PS5" |   |
-| !delete_watch     | Delete a game watch by either game ID or game name.          | !delete_watch "Game Name"                                        |   |
-| !all_games        | List all games currently being watched.                      | !all_games                                                       |   |
-| !get_lowest       | Get the lowest current price for a game.                     | !get_lowest "Game Name" "US" "Windows"                           |   |
-| !list_all         | List all detailed game watch entries.                        | !list_all                                                        |   |
-| !show_commands    | Display all available bot commands with descriptions.        | !show_commands                                                   |   |
-| !get_schedule     | Retrieve the cron schedule for a specific game ID.           | !get_schedule <game_id>                                          |   |
-| !game_info        | Display all stored information about a specific game.        | !game_info "Game Name"                                           |   |
-| !get_best_deal    | Fetch the best current deal for a specified game.            | !get_best_deal "Game Name" "US" "Windows"                        |   |
-| !get_all_time_low | Get the all-time lowest price recorded for a specified game. | !get_all_time_low "Game Name" "US"                               |   |                                                           |                                                                  |   |
+| Command           | Description                                                  | Example Usage                                                    |
+|-------------------|--------------------------------------------------------------|------------------------------------------------------------------|
+| !add_watch        | Add a game watch with specified criteria.                    | !add_watch "Game Name" "US" "discount" "0 9 * * *" 25 "Windows"  |
+| !update_watch     | Update an existing game watch by game ID or name.            | !update_watch "Game Name" "US" "lower than" "0 8 * * *" 30 "PS5" |
+| !delete_watch     | Delete a game watch by either game ID or game name.          | !delete_watch "Game Name"                                        |
+| !all_games        | List all games currently being watched.                      | !all_games                                                       |
+| !get_lowest       | Get the lowest current price for a game.                     | !get_lowest "Game Name" "US" "Windows"                           |
+| !list_all         | List all detailed game watch entries.                        | !list_all                                                        |
+| !show_commands    | Display all available bot commands with descriptions.        | !show_commands                                                   |
+| !get_schedule     | Retrieve the cron schedule for a specific game ID.           | !get_schedule <game_id>                                          |
+| !game_info        | Display all stored information about a specific game.        | !game_info "Game Name"                                           |
+| !get_best_deal    | Fetch the best current deal for a specified game.            | !get_best_deal "Game Name" "US" "Windows"                        |
+| !get_all_time_low | Get the all-time lowest price recorded for a specified game. | !get_all_time_low "Game Name" "US"                               |
 
 # License 
 This project is licensed under the MIT License - see the LICENSE file for details.

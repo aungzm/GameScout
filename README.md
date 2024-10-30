@@ -48,7 +48,22 @@ Create a .env file from sample-env, then in the same repository, pull the docker
 ```bash
 docker run -d --env-file .env --name gamescout aungzm/gamescout:latest
 ```
+```docker-compose.yml
+services:
+  gamescout:
+    image: aungzm/gamescout:latest
+    container_name: gamescout-container
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - API_KEY=${API_KEY}
+      - DB_FILE=${DB_FILE}
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app  # Recommended: To persist sqlite data
+    restart: always
 
+```
 # Bot Commands
 
 | Command           | Description                                                  | Example Usage                                                    |   |

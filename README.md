@@ -36,8 +36,8 @@ Make sure you have `pip` installed, then run:
 ```bash
 pip install -r requirements.txt
 ```
-### Rename the sample-env file to .env
-### Get the [isthereanydeal api](https://isthereanydeal.com/) and paste it in .env
+#### Rename the sample-env file to .env
+#### Get the [isthereanydeal api](https://isthereanydeal.com/) and paste it in .env
 ### Run the bot
 To start the bot:
 ```bash
